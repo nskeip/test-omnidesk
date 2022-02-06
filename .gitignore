@@ -152,3 +152,4 @@ cython_debug/
 #.idea/
 
 settings_local.py
+*.http
