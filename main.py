@@ -4,7 +4,7 @@ import random
 import string
 import json
 from datetime import date, datetime, timedelta
-from typing import List
+from typing import Optional, List
 from urllib.request import urlopen, Request
 
 from settings import *
@@ -75,16 +75,22 @@ def make_dummy_cases(date_from: date) -> List[dict]:
         }
 
 
-def omni_request(path_without_slash):
+def omni_request(path_without_slash: str, data: Optional[dict] = None) -> dict:
     url = f'https://{OMNIDESK_DOMAIN}.omnidesk.ru/api/{path_without_slash}'
 
-    req = Request(url)
+    if not data:
+        data_bytes = None
+    else:
+        data_json = json.dumps(data)
+        data_bytes = data_json.encode('utf-8')
+
+    req = Request(url, data=data_bytes)
+    req.add_header('Accept', 'application/json')
 
     b64_auth_str = base64.b64encode(
         bytes(f'{OMNIDESK_EMAIL}:{OMNIDESK_API_KEY}', 'utf-8')
     ).decode('utf-8')
     req.add_header('Authorization', f'Basic {b64_auth_str}')
-    req.add_header('Accept', 'application/json')
 
     with urlopen(req) as con:
         resp = con.read()
@@ -95,5 +101,5 @@ if __name__ == '__main__':
     # cs = make_dummy_cases(date(2022, 2, 1))
     # for case_i in range(10):
     #     print(next(cs)['created_at'])
-    data = omni_request('cases.json')
-    print('')
+    omni_resp_data = omni_request('cases.json')
+    print(omni_resp_data)
