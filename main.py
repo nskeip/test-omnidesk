@@ -1,15 +1,19 @@
 import base64
-import functools
 import itertools
+import math
 import random
 import string
 import json
 import time
 from datetime import date, datetime, timedelta
-from typing import Optional, Generator
+from typing import Optional, List
+from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 
 from settings import *
+
+CASES_PATH = 'cases.json'
+ITEMS_PER_PAGE = 100
 
 try:
     from settings_local import *
@@ -17,19 +21,17 @@ except ImportError:
     pass
 
 
-def make_dummy_cases(date_from: date) -> Generator[dict, None, None]:
+def make_dummy_cases(date_from: date, date_until: date, n_each_day: int) -> List[dict]:
     """
-    Генератор тестовых обращений:
+    Сделать список тестовых обращений для загрузки в Omnidesk.
 
-    Первому присваивается дата `date_from`.
+        :param date_from: начало периода (включительно)
+        :param date_until: конец периода (не включительно)
+        :param n_each_day: количество обращений в день
+        :returns: список тестовых обращений
 
-    Второму - дата `date_from` + 1 день.
-    Обращению `n` присваивается дата `date_from` + `n`, если эта дата
-    не превосходит сегодняшнего числа. Иначе присваивание дат
-    для этого номера и далее снова возвращается на дату `date_from`.
-
-    Или: дата обращения i = date_from + ((i % (today - date_from + 1)) дней)
     """
+    assert date_from < date_until
 
     FIRST_NAMES = [
         'Alice',
@@ -46,9 +48,16 @@ def make_dummy_cases(date_from: date) -> Generator[dict, None, None]:
         'yahoo.com',
     ]
 
-    today = date.today()
+    dates_of_cases = itertools.takewhile(
+        lambda d: d < date_until,
+        (date_from + timedelta(days=d) for d in itertools.count()),
+    )
 
-    for i in itertools.count():
+    results = []
+
+    for i, (created_at_date, _) in enumerate(
+        itertools.product(dates_of_cases, range(n_each_day))
+    ):
         f_name = random.choice(FIRST_NAMES)
         l_name = random.choice(LAST_NAMES)
 
@@ -62,19 +71,22 @@ def make_dummy_cases(date_from: date) -> Generator[dict, None, None]:
         content = f'Lorem ipsum #{i}'
         content_html = f'<span>{content}</span>'
 
-        created_at_date = date_from + timedelta(days=i % ((today - date_from).days + 1))
         created_at = datetime.combine(created_at_date, datetime.min.time())
 
-        yield {
-            'user_email': email,
-            'user_phone': phone,
-            'user_whatsapp_phone': phone,
-            'user_custom_id': email,
-            'subject': subject,
-            'content': content,
-            'content_html': content_html,
-            'created_at': str(created_at),
-        }
+        results.append(
+            {
+                'user_email': email,
+                'user_phone': phone,
+                'user_whatsapp_phone': phone,
+                'user_custom_id': email,
+                'subject': subject,
+                'content': content,
+                'content_html': content_html,
+                'created_at': str(created_at),
+            }
+        )
+
+    return results
 
 
 def omni_request(path_without_slash: str, data: Optional[dict] = None) -> dict:
@@ -86,7 +98,7 @@ def omni_request(path_without_slash: str, data: Optional[dict] = None) -> dict:
         data_json = json.dumps(data)
         data_bytes = data_json.encode('utf-8')
 
-    req = Request(url, data=data_bytes, method='POST' if data else 'GET')
+    req = Request(url, data=data_bytes)
     req.add_header('Content-type', 'application/json')
 
     b64_auth_str = base64.b64encode(
@@ -99,19 +111,59 @@ def omni_request(path_without_slash: str, data: Optional[dict] = None) -> dict:
         return json.loads(resp.decode('utf-8'))
 
 
-omni_request_cases = functools.partial(omni_request, 'cases.json')
-
-
-def omni_post_dummy_cases(n: int, date_from: date, sleep_secs: int):
-    cases = make_dummy_cases(date_from)
-    for _ in range(n):
-        new_case = next(cases)
-        omni_request_cases(data={'case': new_case})
+def omni_post_dummy_cases(
+    date_from: date, date_until: date, n_each_day: int, sleep_secs: int
+):
+    for new_case in make_dummy_cases(date_from, date_until, n_each_day):
+        omni_request(CASES_PATH, data={'case': new_case})
         time.sleep(sleep_secs)
 
 
+def omni_load_cases(date_from: date) -> List[dict]:
+    """
+    Загружает из Omnidesk обращения, начиная с даты from_date.
+    Учитывает пагинацию и склеивает ответы в один список.
+    Главная функция нашего скрипта.
+
+    :param date_from:
+    :return: список словарей, полученных от Omnidesk
+    """
+    result = []
+
+    next_page_number = 0
+    date_from_timestamp = int(
+        datetime.combine(date_from, datetime.min.time()).timestamp()
+    )
+
+    while True:  # потому что нет do-while
+        params = {
+            'page': next_page_number,
+            'from_time': date_from_timestamp,
+        }
+        url_params = urlencode(params)
+        url = f'{CASES_PATH}?{url_params}'
+        cases_data = omni_request(url)
+
+        result += [v['case'] for k, v in cases_data.items() if k.isdigit()]
+
+        # обновляем информацию о количестве загружаемых страниц,
+        # так как число обращений может измениться во время работы скрипта
+        total_count = cases_data.get('total_count', 1)
+        pages_needed = math.ceil(total_count / ITEMS_PER_PAGE)
+
+        next_page_number += 1
+        if next_page_number < pages_needed:
+            time.sleep(0.5)  # небольшой лаг перед следующим запросом
+        else:
+            break
+
+    return result
+
+
 if __name__ == '__main__':
-    # примерно так можно создать тестовые обращения
-    # omni_post_dummy_cases(200, date(2021, 12, 1), 1)
-    omni_resp_data = omni_request('cases.json')
-    print(omni_resp_data)
+    # Примерно так можно создать тестовые обращения
+    # omni_post_dummy_cases(date(2021, 12, 1), date(2022, 2, 5), 3, 1)
+
+    omni_cases = omni_load_cases(date(2022, 2, 6))
+    print(omni_cases)
+    pass
