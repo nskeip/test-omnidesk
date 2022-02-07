@@ -1,10 +1,12 @@
 import base64
+import functools
 import itertools
 import random
 import string
 import json
+import time
 from datetime import date, datetime, timedelta
-from typing import Optional, List
+from typing import Optional, Generator
 from urllib.request import urlopen, Request
 
 from settings import *
@@ -15,7 +17,7 @@ except ImportError:
     pass
 
 
-def make_dummy_cases(date_from: date) -> List[dict]:
+def make_dummy_cases(date_from: date) -> Generator[dict, None, None]:
     """
     Генератор тестовых обращений:
 
@@ -64,14 +66,14 @@ def make_dummy_cases(date_from: date) -> List[dict]:
         created_at = datetime.combine(created_at_date, datetime.min.time())
 
         yield {
-            'email': email,
-            'phone': phone,
+            'user_email': email,
+            'user_phone': phone,
             'user_whatsapp_phone': phone,
             'user_custom_id': email,
             'subject': subject,
             'content': content,
             'content_html': content_html,
-            'created_at': created_at.timestamp(),
+            'created_at': str(created_at),
         }
 
 
@@ -84,8 +86,8 @@ def omni_request(path_without_slash: str, data: Optional[dict] = None) -> dict:
         data_json = json.dumps(data)
         data_bytes = data_json.encode('utf-8')
 
-    req = Request(url, data=data_bytes)
-    req.add_header('Accept', 'application/json')
+    req = Request(url, data=data_bytes, method='POST' if data else 'GET')
+    req.add_header('Content-type', 'application/json')
 
     b64_auth_str = base64.b64encode(
         bytes(f'{OMNIDESK_EMAIL}:{OMNIDESK_API_KEY}', 'utf-8')
@@ -97,9 +99,19 @@ def omni_request(path_without_slash: str, data: Optional[dict] = None) -> dict:
         return json.loads(resp.decode('utf-8'))
 
 
+omni_request_cases = functools.partial(omni_request, 'cases.json')
+
+
+def omni_post_dummy_cases(n: int, date_from: date, sleep_secs: int):
+    cases = make_dummy_cases(date_from)
+    for _ in range(n):
+        new_case = next(cases)
+        omni_request_cases(data={'case': new_case})
+        time.sleep(sleep_secs)
+
+
 if __name__ == '__main__':
-    # cs = make_dummy_cases(date(2022, 2, 1))
-    # for case_i in range(10):
-    #     print(next(cs)['created_at'])
+    # примерно так можно создать тестовые обращения
+    # omni_post_dummy_cases(200, date(2021, 12, 1), 1)
     omni_resp_data = omni_request('cases.json')
     print(omni_resp_data)
