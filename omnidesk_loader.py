@@ -358,6 +358,7 @@ if __name__ == '__main__':
         from_date = find_date_number_a_month_ago(today)
 
     try:
+        print(f'Загрузка данных, начиная с {from_date}')
         run(date_from=from_date)  # noqa
     except URLError:
         print('Не удается установить соединение с omnidesk.')
