@@ -12,15 +12,13 @@ from urllib.request import urlopen, Request
 
 from settings import *
 
-CASES_PATH = 'cases.json'
-ITEMS_PER_PAGE = 100
-
 try:
     from settings_local import *
 except ImportError:
     pass
 
 
+# region DUMMY CASES HELPER
 def make_dummy_cases(date_from: date, date_until: date, n_each_day: int) -> List[dict]:
     """
     Сделать список тестовых обращений для загрузки в Omnidesk.
@@ -87,6 +85,13 @@ def make_dummy_cases(date_from: date, date_until: date, n_each_day: int) -> List
         )
 
     return results
+
+
+# endregion
+
+# region OMNI FUNCTIONS
+CASES_PATH = 'cases.json'
+ITEMS_PER_PAGE = 100
 
 
 def omni_request(path_without_slash: str, data: Optional[dict] = None) -> dict:
@@ -156,6 +161,8 @@ def omni_load_cases(date_from: date) -> List[dict]:
 
     return result
 
+
+# endregion
 
 if __name__ == '__main__':
     # Примерно так можно создать тестовые обращения
