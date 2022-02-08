@@ -167,8 +167,7 @@ def omni_load_cases(date_from: date) -> List[dict]:
 
 # region DB FUNCTIONS
 def create_db_tables(con: sqlite3.Connection):
-    scripts = [
-        """
+    script = """
         create table cases_recipients
         (
             id  integer not null constraint cases_recipients_pk
@@ -177,8 +176,6 @@ def create_db_tables(con: sqlite3.Connection):
             email        text    not null,
             email_type   text default '' not null -- '', 'cc', 'bcc'
         );
-        """,
-        """
         create table cases_labels
         (
             id  integer not null constraint cases_recipients_pk
@@ -186,8 +183,6 @@ def create_db_tables(con: sqlite3.Connection):
             omni_case_id integer not null,
             label        integer not null
         );
-        """,
-        """
         create table cases
         (
             id  integer not null constraint cases_pk
@@ -211,12 +206,9 @@ def create_db_tables(con: sqlite3.Connection):
             closing_speed integer,
             language_id integer
         );
-        """,
-    ]
+        """
     cur = con.cursor()
-    for s in scripts:
-        cur.execute(s)
-    con.commit()
+    cur.executescript(script)
     cur.close()
 
 
