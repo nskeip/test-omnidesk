@@ -1,3 +1,4 @@
+import argparse
 import base64
 import copy
 import itertools
@@ -281,21 +282,83 @@ def upsert_without_commit(con: sqlite3.Connection, case: dict):
 # endregion
 
 
+# region DATE FUNCTIONS
+
+
+def find_date_number_a_month_ago(some_date: date):
+    """
+    Найти дату "месяц назад".
+
+    В простом случае - это просто "31 день назад",
+    но так как количество дней месяцев не одинаково,
+    то 31 день назад может быть другое число месяца.
+    Поэтому мы ищем дату в предыдущем месяце,
+    число которой совпадает с текущим числом.
+    Если такой даты нет (например, в соответствие
+    дате 31 марта мы не можем поставить "31" февраля),
+    то мы берем максимальную дату предыдущего месяца.
+
+
+    31 января 2022 года -> 31 декабря 2021 года
+    31 марта 2020 года -> 29 февраля 2022 года
+    31 марта 2022 года -> 28 февраля 2022 года
+    """
+    # считаем максимальное число предыдущего месяца
+    last_day_of_prev_month = some_date.replace(day=1) - timedelta(days=1)
+    return next(
+        itertools.chain(
+            itertools.dropwhile(  # пытаемся вычитать 28, 29, 30, 31 день
+                lambda d: d.day != some_date.day,
+                ((some_date - timedelta(days=i)) for i in range(28, 32)),
+            ),
+            [last_day_of_prev_month],  # ...если с вычитанием не получилось
+        )
+    )
+
+
+# endregion
+
+
 def run(date_from=None, database_path=DATABASE_PATH):
     with sqlite3.connect(database_path) as con:
         con.row_factory = sqlite3.Row
 
         create_db_tables_if_not_exist(con)
 
-        omni_cases = omni_load_cases(date(2021, 12, 1))
+        omni_cases = omni_load_cases(date_from)
         for case in omni_cases:
             upsert_without_commit(con, case)
         con.commit()
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(prog=f'python3 {__file__}', add_help=False)
+    parser.add_argument(
+        '-h',
+        '--help',
+        help='Вывести это сообщение-подсказку и ничего не загружать',
+        action='help',
+        default=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        '--from_date',
+        help='Начало периода, в формате ГГГГ-ММ-ДД (например, 2020-12-31)',
+    )
+    args = parser.parse_args()
+
+    if args.from_date:
+        try:
+            from_date = datetime.strptime(args.from_date, '%Y-%m-%d')
+        except ValueError:
+            print('Неверный формат даты. Верный формат: ГГГГ-ММ-ДД')
+            exit(1)
+    else:
+        # ищем в предыдущем месяце такое же число, как у сегодняшнего дня
+        today = date.today()
+        from_date = find_date_number_a_month_ago(today)
+
     try:
-        run()
+        run(date_from=from_date)  # noqa
     except URLError:
         print("Не удается установить соединение с omnidesk.")
     except OmnideskApiOutdated:
@@ -305,3 +368,5 @@ if __name__ == '__main__':
         )
     except sqlite3.Error:
         print("Ошибка записи в базу данных.")
+
+    print("Готово")
