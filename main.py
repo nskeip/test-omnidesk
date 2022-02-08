@@ -208,7 +208,7 @@ def create_db_tables_if_not_exist(con: sqlite3.Connection):
             language_id integer
         );
         
-        create unique index cases_omni_case_id_uindex on cases (omni_case_id);
+        create unique index if not exists cases_omni_case_id_uindex on cases (omni_case_id);
         
         """
     cur = con.cursor()
