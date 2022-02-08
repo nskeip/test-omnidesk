@@ -1,4 +1,5 @@
 import base64
+import copy
 import itertools
 import math
 import random
@@ -90,7 +91,7 @@ def make_dummy_cases(date_from: date, date_until: date, n_each_day: int) -> List
 
 # endregion
 
-# region OMNI FUNCTIONS
+# region OMNI API FUNCTIONS
 CASES_PATH = 'cases.json'
 ITEMS_PER_PAGE = 100
 
@@ -206,10 +207,67 @@ def create_db_tables_if_not_exist(con: sqlite3.Connection):
             closing_speed integer,
             language_id integer
         );
+        
+        create unique index cases_omni_case_id_uindex on cases (omni_case_id);
+        
         """
     cur = con.cursor()
     cur.executescript(script)
     cur.close()
+
+
+def save_case(con: sqlite3.Connection, case: dict):
+    """
+    Добавляет или обновляет выгруженное обращение в бд
+
+    :param con: соединение sqlite
+    :param case: словарь, один из списка, возвращенного omni_load_cases
+    :return:
+    """
+
+    # TODO: cc, bcc
+
+    def _db_friendly_copy(d):
+        copy_of_d = copy.deepcopy(d)
+        copy_of_d['omni_case_id'] = d['case_id']
+        del copy_of_d['case_id']
+        return copy_of_d
+
+    # делаем shadow, чтобы избежать перезаписи
+    case = _db_friendly_copy(case)  # noqa
+
+    columns = [
+        'omni_case_id',
+        'case_number',
+        'subject',
+        'user_id',
+        'staff_id',
+        'group_id',
+        'status',
+        'priority',
+        'channel',
+        'deleted',
+        'spam',
+        'created_at',
+        'closed_at',
+        'updated_at',
+        'last_response_at',
+        'parent_case_id',
+        'closing_speed',
+        'language_id',
+    ]
+
+    values_placeholder_for_insert = ','.join(f':{c}' for c in columns)
+    insert_pattern = f"insert into cases ({','.join(columns)}) values ({values_placeholder_for_insert})"
+
+    kv_placeholder_for_update = ','.join(f'{c}=:{c}' for c in columns)
+    nested_update_pattern = f'update set {kv_placeholder_for_update}'
+
+    query_pattern = (
+        f'{insert_pattern} on conflict(omni_case_id) do {nested_update_pattern}'
+    )
+
+    con.cursor().execute(query_pattern, case)
 
 
 # endregion
@@ -218,9 +276,11 @@ if __name__ == '__main__':
     # Примерно так можно создать тестовые обращения
     # omni_post_dummy_cases(date(2021, 12, 1), date(2022, 2, 5), 3, 1)
 
-    # omni_cases = omni_load_cases(date(2022, 2, 6))
-    # print(omni_cases)
-    # pass
-
     con = sqlite3.connect(DATABASE_PATH)
-    create_db_tables_if_not_exist(con)
+    con.row_factory = sqlite3.Row
+
+    # create_db_tables_if_not_exist(con)
+    omni_cases = omni_load_cases(date(2022, 2, 6))
+    for case in omni_cases:
+        save_case(con, case)
+    con.commit()
