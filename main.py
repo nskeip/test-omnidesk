@@ -166,9 +166,9 @@ def omni_load_cases(date_from: date) -> List[dict]:
 # endregion
 
 # region DB FUNCTIONS
-def create_db_tables(con: sqlite3.Connection):
+def create_db_tables_if_not_exist(con: sqlite3.Connection):
     script = """
-        create table cases_recipients
+        create table if not exists ases_recipients
         (
             id  integer not null constraint cases_recipients_pk
                 primary key autoincrement,
@@ -176,14 +176,14 @@ def create_db_tables(con: sqlite3.Connection):
             email        text    not null,
             email_type   text default '' not null -- '', 'cc', 'bcc'
         );
-        create table cases_labels
+        create table if not exists cases_labels
         (
             id  integer not null constraint cases_recipients_pk
                 primary key autoincrement,
             omni_case_id integer not null,
             label        integer not null
         );
-        create table cases
+        create table if not exists cases
         (
             id  integer not null constraint cases_pk
                 primary key autoincrement,
@@ -223,4 +223,4 @@ if __name__ == '__main__':
     # pass
 
     con = sqlite3.connect(DATABASE_PATH)
-    create_db_tables(con)
+    create_db_tables_if_not_exist(con)
