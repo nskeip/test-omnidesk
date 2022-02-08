@@ -4,7 +4,8 @@
 
 ## Настройка
 
-В папке скрипта создаем файл `settings_local.py`, содержащий настройки подключения к Omnidesk:
+Клонируем репозиторий, а затем в папке скрипта создаем файл `settings_local.py`, 
+содержащий настройки подключения к Omnidesk:
 ```python
 OMNIDESK_DOMAIN = 'example'             # поддомен Omnidesk
 OMNIDESK_EMAIL = 'example@example.com'  # email сотрудника 
