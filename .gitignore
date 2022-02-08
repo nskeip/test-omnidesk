@@ -153,3 +153,4 @@ cython_debug/
 
 settings_local.py
 *.http
+*.sqlite

@@ -5,6 +5,7 @@ import random
 import string
 import json
 import time
+import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Optional, List
 from urllib.parse import urlencode
@@ -164,10 +165,70 @@ def omni_load_cases(date_from: date) -> List[dict]:
 
 # endregion
 
+# region DB FUNCTIONS
+def create_db_tables(con: sqlite3.Connection):
+    scripts = [
+        """
+        create table cases_recipients
+        (
+            id  integer not null constraint cases_recipients_pk
+                primary key autoincrement,
+            omni_case_id integer not null,
+            email        text    not null,
+            email_type   text default '' not null -- '', 'cc', 'bcc'
+        );
+        """,
+        """
+        create table cases_labels
+        (
+            id  integer not null constraint cases_recipients_pk
+                primary key autoincrement,
+            omni_case_id integer not null,
+            label        integer not null
+        );
+        """,
+        """
+        create table cases
+        (
+            id  integer not null constraint cases_pk
+                primary key autoincrement,
+            omni_case_id integer not null,
+            case_number text,
+            subject text default '' not null,
+            user_id integer,
+            staff_id integer,
+            group_id integer,
+            status text,
+            priority text,
+            channel text,
+            deleted integer,
+            spam integer,
+            created_at integer,
+            closed_at integer,
+            updated_at integer,
+            last_response_at integer,
+            parent_case_id integer,
+            closing_speed integer,
+            language_id integer
+        );
+        """,
+    ]
+    cur = con.cursor()
+    for s in scripts:
+        cur.execute(s)
+    con.commit()
+    cur.close()
+
+
+# endregion
+
 if __name__ == '__main__':
     # Примерно так можно создать тестовые обращения
     # omni_post_dummy_cases(date(2021, 12, 1), date(2022, 2, 5), 3, 1)
 
-    omni_cases = omni_load_cases(date(2022, 2, 6))
-    print(omni_cases)
-    pass
+    # omni_cases = omni_load_cases(date(2022, 2, 6))
+    # print(omni_cases)
+    # pass
+
+    con = sqlite3.connect(DATABASE_PATH)
+    create_db_tables(con)
