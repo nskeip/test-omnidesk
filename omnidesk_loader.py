@@ -348,7 +348,7 @@ if __name__ == '__main__':
 
     if args.from_date:
         try:
-            from_date = datetime.strptime(args.from_date, '%Y-%m-%d')
+            from_date = datetime.strptime(args.from_date, '%Y-%m-%d').date()
         except ValueError:
             print('Неверный формат даты. Верный формат: ГГГГ-ММ-ДД')
             exit(1)
@@ -358,8 +358,8 @@ if __name__ == '__main__':
         from_date = find_date_number_a_month_ago(today)
 
     try:
-        print(f'Загрузка данных, начиная с {from_date}')
-        run(date_from=from_date)  # noqa
+        print(f'Загрузка данных, начиная с {from_date}')  # noqa
+        run(date_from=from_date)
     except URLError:
         print('Не удается установить соединение с omnidesk.')
     except OmnideskApiOutdated:
