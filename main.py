@@ -131,14 +131,11 @@ def omni_load_cases(date_from: date) -> List[dict]:
     result = []
 
     next_page_number = 0
-    date_from_timestamp = int(
-        datetime.combine(date_from, datetime.min.time()).timestamp()
-    )
 
     while True:  # потому что нет do-while
         params = {
             'page': next_page_number,
-            'from_time': date_from_timestamp,
+            'from_time': str(date_from),
         }
         url_params = urlencode(params)
         url = f'{CASES_PATH}?{url_params}'
