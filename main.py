@@ -265,13 +265,12 @@ if __name__ == '__main__':
     # Примерно так можно создать тестовые обращения
     # omni_post_dummy_cases(date(2021, 12, 1), date(2022, 2, 5), 3, 1)
 
-    con = sqlite3.connect(DATABASE_PATH)
-    con.row_factory = sqlite3.Row
+    with sqlite3.connect(DATABASE_PATH) as con:
+        con.row_factory = sqlite3.Row
 
-    create_db_tables_if_not_exist(con)
+        create_db_tables_if_not_exist(con)
 
-    omni_cases = omni_load_cases(date(2021, 12, 1))
-    for case in omni_cases:
-        upsert_without_commit(con, case)
-    con.commit()
-    con.close()
+        omni_cases = omni_load_cases(date(2021, 12, 1))
+        for case in omni_cases:
+            upsert_without_commit(con, case)
+        con.commit()
