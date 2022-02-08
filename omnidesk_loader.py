@@ -360,13 +360,13 @@ if __name__ == '__main__':
     try:
         run(date_from=from_date)  # noqa
     except URLError:
-        print("Не удается установить соединение с omnidesk.")
+        print('Не удается установить соединение с omnidesk.')
     except OmnideskApiOutdated:
         print(
-            "Похоже, вы пользуетесь устаревшей версией API Omnidesk. "
-            "Обратитесь к разработчику для обновления скрипта."
+            'Похоже, вы пользуетесь устаревшей версией API Omnidesk. '
+            'Обратитесь к разработчику для обновления скрипта.'
         )
     except sqlite3.Error:
-        print("Ошибка записи в базу данных.")
+        print('Ошибка записи в базу данных.')
 
-    print("Готово")
+    print('Готово')
