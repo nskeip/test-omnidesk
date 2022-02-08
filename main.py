@@ -169,21 +169,6 @@ def omni_load_cases(date_from: date) -> List[dict]:
 # region DB FUNCTIONS
 def create_db_tables_if_not_exist(con: sqlite3.Connection):
     script = """
-        create table if not exists ases_recipients
-        (
-            id  integer not null constraint cases_recipients_pk
-                primary key autoincrement,
-            omni_case_id integer not null,
-            email        text    not null,
-            email_type   text default '' not null -- '', 'cc', 'bcc'
-        );
-        create table if not exists cases_labels
-        (
-            id  integer not null constraint cases_recipients_pk
-                primary key autoincrement,
-            omni_case_id integer not null,
-            label        integer not null
-        );
         create table if not exists cases
         (
             id  integer not null constraint cases_pk
@@ -195,8 +180,11 @@ def create_db_tables_if_not_exist(con: sqlite3.Connection):
             staff_id integer,
             group_id integer,
             status text,
-            priority text,
+            priority text default '' not null,
             channel text,
+            recipient text default '' not null,
+            cc_emails text default '' not null,
+            bcc_emails text default '' not null,
             deleted integer,
             spam integer,
             created_at integer,
@@ -216,7 +204,7 @@ def create_db_tables_if_not_exist(con: sqlite3.Connection):
     cur.close()
 
 
-def save_case(con: sqlite3.Connection, case: dict):
+def upsert_without_commit(con: sqlite3.Connection, case: dict):
     """
     Добавляет или обновляет выгруженное обращение в бд
 
@@ -224,8 +212,6 @@ def save_case(con: sqlite3.Connection, case: dict):
     :param case: словарь, один из списка, возвращенного omni_load_cases
     :return:
     """
-
-    # TODO: cc, bcc
 
     def _db_friendly_copy(d):
         copy_of_d = copy.deepcopy(d)
@@ -246,6 +232,9 @@ def save_case(con: sqlite3.Connection, case: dict):
         'status',
         'priority',
         'channel',
+        'recipient',
+        'cc_emails',
+        'bcc_emails',
         'deleted',
         'spam',
         'created_at',
@@ -279,8 +268,9 @@ if __name__ == '__main__':
     con = sqlite3.connect(DATABASE_PATH)
     con.row_factory = sqlite3.Row
 
-    # create_db_tables_if_not_exist(con)
-    omni_cases = omni_load_cases(date(2022, 2, 6))
+    create_db_tables_if_not_exist(con)
+
+    omni_cases = omni_load_cases(date(2021, 12, 1))
     for case in omni_cases:
-        save_case(con, case)
+        upsert_without_commit(con, case)
     con.commit()
