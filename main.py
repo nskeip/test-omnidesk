@@ -9,6 +9,7 @@ import time
 import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Optional, List
+from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 
@@ -20,6 +21,13 @@ except ImportError:
     pass
 
 
+# region EXCEPTIONS
+class OmnideskApiOutdated(Exception):
+    pass
+
+
+# endregion
+
 # region DUMMY CASES HELPER
 def make_dummy_cases(date_from: date, date_until: date, n_each_day: int) -> List[dict]:
     """
@@ -30,6 +38,8 @@ def make_dummy_cases(date_from: date, date_until: date, n_each_day: int) -> List
         :param n_each_day: количество обращений в день
         :returns: список тестовых обращений
 
+    Примерно так можно создать тестовые обращения:
+    omni_post_dummy_cases(date(2021, 12, 1), date(2022, 2, 5), 3, 1)
     """
     assert date_from < date_until
 
@@ -148,11 +158,20 @@ def omni_load_cases(date_from: date) -> List[dict]:
         url = f'{CASES_PATH}?{url_params}'
         cases_data = omni_request(url)
 
-        result += [v['case'] for k, v in cases_data.items() if k.isdigit()]
+        try:
 
-        # обновляем информацию о количестве загружаемых страниц,
-        # так как число обращений может измениться во время работы скрипта
-        total_count = cases_data.get('total_count', 1)
+            result += [v['case'] for k, v in cases_data.items() if k.isdigit()]
+
+            # обновляем информацию о количестве загружаемых страниц,
+            # так как число обращений может измениться во время работы скрипта
+            total_count = cases_data['total_count']
+            assert isinstance(total_count, int)
+        except (
+            KeyError,
+            AssertionError,
+        ):
+            raise OmnideskApiOutdated()
+
         pages_needed = math.ceil(total_count / ITEMS_PER_PAGE)
 
         next_page_number += 1
@@ -261,11 +280,9 @@ def upsert_without_commit(con: sqlite3.Connection, case: dict):
 
 # endregion
 
-if __name__ == '__main__':
-    # Примерно так можно создать тестовые обращения
-    # omni_post_dummy_cases(date(2021, 12, 1), date(2022, 2, 5), 3, 1)
 
-    with sqlite3.connect(DATABASE_PATH) as con:
+def run(date_from=None, database_path=DATABASE_PATH):
+    with sqlite3.connect(database_path) as con:
         con.row_factory = sqlite3.Row
 
         create_db_tables_if_not_exist(con)
@@ -274,3 +291,17 @@ if __name__ == '__main__':
         for case in omni_cases:
             upsert_without_commit(con, case)
         con.commit()
+
+
+if __name__ == '__main__':
+    try:
+        run()
+    except URLError:
+        print("Не удается установить соединение с omnidesk.")
+    except OmnideskApiOutdated:
+        print(
+            "Похоже, вы пользуетесь устаревшей версией API Omnidesk. "
+            "Обратитесь к разработчику для обновления скрипта."
+        )
+    except sqlite3.Error:
+        print("Ошибка записи в базу данных.")
