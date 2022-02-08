@@ -274,3 +274,4 @@ if __name__ == '__main__':
     for case in omni_cases:
         upsert_without_commit(con, case)
     con.commit()
+    con.close()
